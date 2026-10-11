@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { gradeClass, fmtN } from '../lib/grades'
 import { cvar } from '../lib/model'
+import { useInstall } from '../lib/layout'
 
 /* ---------- avisos inferiores (con «Deshacer») ---------- */
 const ToastCtx = createContext(() => {})
@@ -124,3 +125,23 @@ const ICONS = {
 export const Icon = ({ name, size }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[name]}</svg>
 )
+
+/* ---------- instalar como app ---------- */
+export function InstallButton({ className = 'btn sm primary', label = 'Instalar app' }) {
+  const install = useInstall(), { open } = useModal()
+  if (!install.can) return null
+  const go = async () => { if ((await install.run()) === 'ios') open(<IosInstallModal />) }
+  return <button type="button" className={className} onClick={go}>{label}</button>
+}
+function IosInstallModal() {
+  return (
+    <Modal title="Instalar eProfy en el iPhone">
+      <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <li>Abre esta página en <b>Safari</b> (en otros navegadores del iPhone no se puede instalar).</li>
+        <li>Toca el botón <b>Compartir</b>: el cuadrado con una flecha hacia arriba.</li>
+        <li>Elige <b>Añadir a pantalla de inicio</b> y pulsa <b>Añadir</b>.</li>
+      </ol>
+      <p className="muted" style={{ margin: 0 }}>eProfy aparecerá con su icono y se abrirá a pantalla completa, como una app más.</p>
+    </Modal>
+  )
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { auth, configured } from '../firebase'
-import { useToast } from '../components/ui.jsx'
+import { useToast, InstallButton } from '../components/ui.jsx'
 
 const AUTH_ERR = {
   'auth/invalid-email': 'El correo no tiene un formato válido.',
@@ -14,8 +14,11 @@ const AUTH_ERR = {
   'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos.',
   'auth/network-request-failed': 'No hay conexión a internet.',
   'auth/popup-closed-by-user': 'Has cerrado la ventana de Google antes de terminar.',
-  'auth/unauthorized-domain': 'Este dominio no está autorizado en Firebase (Authentication → Configuración → Dominios autorizados).',
-  'auth/operation-not-allowed': 'Este método de acceso no está activado en Firebase.'
+  'auth/unauthorized-domain': 'Este dominio no está autorizado en Firebase: añádelo en Authentication → Configuración → Dominios autorizados (por ejemplo, tu-app.vercel.app).',
+  'auth/configuration-not-found': 'El inicio de sesión no está activado: en Firebase ve a Authentication → Comenzar y activa Correo electrónico/contraseña y Google.',
+  'auth/invalid-api-key': 'La apiKey de src/firebase-config.js no es válida: cópiala de nuevo desde la consola de Firebase.',
+  'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'La apiKey de src/firebase-config.js no es válida: cópiala de nuevo desde la consola de Firebase.',
+  'auth/operation-not-allowed': 'Este método de acceso no está activado: en Firebase ve a Authentication → Método de acceso y actívalo.'
 }
 export const authMsg = e => AUTH_ERR[e && e.code] || ('No se pudo entrar' + (e && e.code ? ' (' + e.code + ')' : '') + '.')
 
@@ -52,7 +55,14 @@ export default function Login({ error, onError, onLocal }) {
         <div className="brand"><div className="brand-mark">e</div><b>eProfy</b></div>
         <p>Tu cuaderno de clase: notas por criterios, asistencia, entregas, calendario y horario.</p>
         {!configured ? (
-          <div className="setup">Falta conectar la base de datos. Rellena <b>src/firebase-config.js</b> siguiendo el LEEME. Mientras tanto puedes usar la app solo en este dispositivo.</div>
+          <>
+            <button type="button" className="btn primary" onClick={onLocal}>Empezar a usar eProfy</button>
+            <InstallButton className="btn" label="Instalar como app" />
+            <div className="setup">
+              <b>La sincronización entre dispositivos aún no está activada.</b> Puedes usar eProfy ya en este dispositivo: cuando se active, lo que tengas aquí se subirá solo.
+              <br /><span className="muted">Para activarla hay que pegar los datos de tu proyecto de Firebase en <b>src/firebase-config.js</b> (ver README).</span>
+            </div>
+          </>
         ) : (
           <>
             <button type="button" className="btn" onClick={google} disabled={busy}>
@@ -71,7 +81,10 @@ export default function Login({ error, onError, onLocal }) {
             <div className="or">o</div>
           </>
         )}
-        <button type="button" className="linkbtn" onClick={onLocal}>Usar sin cuenta (solo en este dispositivo)</button>
+        {configured ? <>
+          <button type="button" className="linkbtn" onClick={onLocal}>Usar sin cuenta (solo en este dispositivo)</button>
+          <InstallButton className="btn" label="Instalar como app" />
+        </> : null}
       </form>
     </div>
   )

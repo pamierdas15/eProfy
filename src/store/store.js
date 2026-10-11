@@ -128,7 +128,22 @@ export function startCloud(user) {
   state = { ...state, mode: 'connecting', user: { uid: user.uid, email: user.email, name: user.displayName }, docs: loadLocal(), err: null, phase: 'app' }
   emit()
   col = collection(db, 'users', user.uid, 'docs')
-  unsub = onSnapshot(col, { includeMetadataChanges: true }, onSnap, err => { console.error(err); state = { ...state, err: 'Sin conexión con la base de datos' }; emit() })
+  unsub = onSnapshot(col, { includeMetadataChanges: true }, onSnap, err => {
+    console.error(err)
+    // La app sigue funcionando con los datos de este dispositivo; al arreglarlo, se suben solos
+    unsub = null
+    state = { ...state, mode: 'local', err: firestoreMsg(err) }
+    emit()
+  })
+}
+/** Explica en castellano por qué Firestore no responde y cómo arreglarlo. */
+export function firestoreMsg(e) {
+  const c = e && e.code
+  if (c === 'permission-denied') return 'Firebase no deja leer los datos: publica las reglas de firestore.rules en Firestore Database → Reglas.'
+  if (c === 'not-found' || c === 'failed-precondition') return 'La base de datos no existe todavía: créala en Firebase → Firestore Database → Crear base de datos.'
+  if (c === 'unauthenticated') return 'La sesión ha caducado: cierra sesión y vuelve a entrar.'
+  if (c === 'unavailable') return 'No hay conexión con Firebase. Los cambios se guardan en este dispositivo.'
+  return 'No hay conexión con la base de datos' + (c ? ' (' + c + ')' : '') + '. Los cambios se guardan en este dispositivo.'
 }
 export function stopCloud() { if (unsub) { unsub(); unsub = null } col = null }
 export const hasPendingWrites = () => dirty.size > 0

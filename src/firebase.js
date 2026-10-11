@@ -3,6 +3,7 @@ import { getAuth } from 'firebase/auth'
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 import { firebaseConfig } from './firebase-config'
 
+export const projectId = firebaseConfig.projectId
 export const configured = !!firebaseConfig.apiKey && !String(firebaseConfig.apiKey).startsWith('PEGA')
 
 let app = null, auth = null, db = null

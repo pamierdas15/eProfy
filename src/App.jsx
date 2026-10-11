@@ -4,7 +4,7 @@ import { onAuthStateChanged, getRedirectResult, signOut as fbSignOut } from 'fir
 import { auth, configured } from './firebase'
 import { useAppState, startLocal, startCloud, stopCloud, setPhase, hasPendingWrites } from './store/store'
 import { useLayout } from './lib/layout'
-import { Icon, useToast } from './components/ui.jsx'
+import { Icon, useToast, InstallButton } from './components/ui.jsx'
 import Login, { authMsg } from './views/Login.jsx'
 import Hoy from './views/Hoy.jsx'
 import Grupos from './views/Grupos.jsx'
@@ -75,6 +75,7 @@ export default function App() {
         <main>
           <div className="topbar">
             <div className="left"><div className="brand"><div className="brand-mark">e</div><b>eProfy</b></div><SyncStatus st={st} /></div>
+            <InstallButton className="btn sm primary tb-install" />
             <div className="seg layout-seg" role="group" aria-label="Formato de la app">
               {[['auto', 'Automático'], ['mobile', 'Móvil'], ['desktop', 'PC']].map(([k, l]) => (
                 <button key={k} aria-pressed={layout === k} title={'Formato ' + l} onClick={() => setLayout(k)}><Icon name={k} size={16} /><span className="lt">{l}</span></button>
@@ -90,9 +91,9 @@ export default function App() {
 
 function SyncStatus({ st }) {
   let s, t
-  if (st.mode === 'connecting') { s = 'saving'; t = 'Conectando…' }
+  if (st.err) { s = 'error'; t = st.err }
+  else if (st.mode === 'connecting') { s = 'saving'; t = 'Conectando…' }
   else if (st.mode !== 'cloud') { s = 'local'; t = 'Solo en este dispositivo' }
-  else if (st.err) { s = 'error'; t = st.err }
   else if (!st.online) { s = 'saving'; t = 'Sin conexión · se sincronizará' }
   else if (st.pending) { s = 'saving'; t = 'Guardando…' }
   else { s = 'ok'; t = 'Sincronizado' }

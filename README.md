@@ -1,4 +1,4 @@
-# eProfy (React + Vite) · versión Prueba 01
+# eProfy (React + Vite) · versión Prueba 03
 
 Cuaderno del profesor para el instituto: notas por criterios LOMLOE, asistencia, tareas y entregas, calendario con días no lectivos, horario semanal con cambios puntuales, exportación a Excel y copias de seguridad. Es una PWA instalable que se adapta al móvil y al PC y sincroniza los datos con Firebase.
 
@@ -60,6 +60,20 @@ Cada `git push` a `main` publica una versión nueva automáticamente.
 - **PC (Chrome o Edge):** icono de instalar en la barra de direcciones.
 
 Entra con la misma cuenta en todos los dispositivos.
+
+## Si algo no funciona
+
+eProfy indica en **Ajustes → Cuenta y sincronización** qué falta. La app siempre se puede usar e instalar, aunque Firebase no esté listo: los datos se guardan en el dispositivo y se suben solos cuando la conexión funcione.
+
+| Mensaje | Qué hacer |
+|---|---|
+| «La sincronización entre dispositivos aún no está activada» | Pega los datos de tu proyecto en `src/firebase-config.js` (paso 1.5) y sube el cambio a GitHub. |
+| «El inicio de sesión no está activado» | Firebase → Authentication → Comenzar → activa Correo y Google (paso 1.4). |
+| «Este dominio no está autorizado» | Añade tu dominio de Vercel en Authentication → Configuración → Dominios autorizados. |
+| «La base de datos no existe todavía» | Crea la base de datos en Firestore Database (paso 1.2). |
+| «Firebase no deja leer los datos» | Publica las reglas de `firestore.rules` (paso 1.3). |
+| «La apiKey no es válida» | Vuelve a copiar `firebaseConfig` desde la consola de Firebase. |
+
 
 ---
 

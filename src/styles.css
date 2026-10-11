@@ -225,6 +225,8 @@ html.m .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 .topbar .sync[data-s="ok"] .dot{background:var(--not)} .topbar .sync[data-s="saving"] .dot{background:var(--suf)} .topbar .sync[data-s="error"] .dot{background:var(--ins)}
 .topbar .left{display:flex;flex-direction:column;gap:2px;min-width:0}
 .layout-seg{margin-left:auto}
+.tb-install{margin-left:auto}
+.tb-install + .layout-seg{margin-left:0}
 .layout-seg button{display:inline-flex;align-items:center;gap:6px;padding:5px 10px}
 .layout-seg svg{width:16px;height:16px}
 html.m .layout-seg .lt{display:none}

@@ -30,3 +30,34 @@ export function useLayout() {
   const setPref = v => { try { localStorage.setItem('eprofy.layout', v) } catch (e) { /* */ } setPrefState(v) }
   return [pref, setPref]
 }
+
+/* ---------- instalar como app ---------- */
+// El navegador avisa de que se puede instalar con «beforeinstallprompt» (Chrome, Edge, Samsung…).
+// Se guarda en cuanto llega, aunque la pantalla que muestra el botón aún no exista.
+let deferred = null
+const subs = new Set()
+const notify = () => subs.forEach(f => f())
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; notify() })
+  window.addEventListener('appinstalled', () => { deferred = null; notify() })
+}
+export const isStandalone = () => typeof window !== 'undefined' &&
+  (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true)
+export const isIOS = () => typeof navigator !== 'undefined' &&
+  (/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+
+/**
+ * { can, run, ios }: `can` = se puede ofrecer instalar; `run()` abre el aviso del navegador
+ * o, en iPhone/iPad (Safari no tiene aviso), muestra cómo hacerlo a mano.
+ */
+export function useInstall() {
+  const [, force] = useState(0)
+  useEffect(() => { const f = () => force(x => x + 1); subs.add(f); return () => subs.delete(f) }, [])
+  const ios = isIOS()
+  const can = !isStandalone() && (!!deferred || ios)
+  const run = async () => {
+    if (deferred) { const d = deferred; deferred = null; notify(); d.prompt(); try { await d.userChoice } catch (e) { /* */ } return 'prompt' }
+    return 'ios'
+  }
+  return { can, run, ios }
+}

@@ -1,7 +1,9 @@
 import { useAppState, replaceAll } from '../store/store'
 import * as act from '../store/actions'
 import { useNav } from '../nav'
-import { useModal, useToast, Confirm } from '../components/ui.jsx'
+import { useModal, useToast, Confirm, InstallButton } from '../components/ui.jsx'
+import { configured, projectId } from '../firebase'
+import { isStandalone } from '../lib/layout'
 import { ExcelModal } from '../modals/CalendarModals.jsx'
 import { loadSample } from '../lib/sample'
 import { exportJson } from '../lib/excel'
@@ -60,7 +62,25 @@ export default function Ajustes() {
               {st.user ? <>Has entrado como <b>{who}</b>. Tus datos se guardan en tu base de datos de Firebase y se sincronizan entre todos los dispositivos donde entres con esta cuenta. Sin conexión puedes seguir trabajando: los cambios se envían al volver la red.</>
                 : 'Estás usando eProfy sin cuenta: los datos solo se guardan en este navegador. Entra con una cuenta para sincronizarlos entre el móvil y el portátil; lo que tengas aquí se subirá la primera vez.'}
             </p>
-            <button className="btn" onClick={signOut}>{st.user ? 'Cerrar sesión' : 'Entrar con una cuenta'}</button>
+            <div className="affected" style={{ marginBottom: 12 }}>
+              <div>Base de datos: {configured ? <>proyecto <b>{projectId}</b></> : <b>sin configurar</b>}</div>
+              <div>Estado: {st.err ? <span style={{ color: 'var(--ins)', fontWeight: 700 }}>{st.err}</span> : st.mode === 'cloud' ? 'conectada y sincronizando' : st.mode === 'connecting' ? 'conectando…' : 'trabajando solo en este dispositivo'}</div>
+              {!configured ? <div className="muted">Para sincronizar el móvil y el PC, pega los datos de tu proyecto de Firebase en src/firebase-config.js (ver README).</div> : null}
+            </div>
+            <div className="row">
+              {configured || st.user ? <button className="btn" onClick={signOut}>{st.user ? 'Cerrar sesión' : 'Entrar con una cuenta'}</button> : null}
+              {st.err ? <button className="btn" onClick={() => window.location.reload()}>Reintentar conexión</button> : null}
+            </div>
+          </div>
+          <div className="panel">
+            <h2 style={{ marginBottom: 8 }}>Instalar la app</h2>
+            {isStandalone() ? <p className="muted" style={{ margin: 0 }}>eProfy ya está instalada en este dispositivo.</p> : (
+              <>
+                <p className="muted" style={{ margin: '0 0 12px' }}>Instálala para abrirla desde su icono, a pantalla completa y sin conexión. No necesita tienda de aplicaciones.</p>
+                <div className="row"><InstallButton className="btn primary" label="Instalar eProfy" /></div>
+                <p className="legend">Si no aparece el botón: en Android, menú ⋮ de Chrome → Instalar aplicación; en iPhone, Safari → Compartir → Añadir a pantalla de inicio.</p>
+              </>
+            )}
           </div>
           <div className="panel">
             <h2 style={{ marginBottom: 8 }}>Copia de seguridad</h2>

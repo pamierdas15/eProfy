@@ -10,7 +10,7 @@
 
 export const SCHEMA = 2
 /** Versión visible de la app (se muestra en Ajustes). */
-export const APP_VERSION = 'Prueba 01'
+export const APP_VERSION = 'Prueba 03'
 
 export const defaultTrims = () => [
   { start: '2026-09-08', end: '2026-12-22' },
