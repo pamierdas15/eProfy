@@ -1,25 +1,46 @@
 // Almacén de datos de eProfy.
 //
-// - Los datos viven en `state.docs` (ver lib/model.js) y se pintan con React (useAppState).
+// - Cada usuario tiene varios colegios. La lista está en el documento `schools`
+//   ({ list: [{ id, name, format, created }] }) y los datos de cada colegio en documentos
+//   con su prefijo: `<colegio>.meta`, `<colegio>.g_<grupo>`, `<colegio>.a_<grupo>` (ver lib/model.js).
+// - `state.raw` guarda todos los documentos; `state.docs` es la vista del colegio abierto, sin
+//   prefijo, que es lo que usan las pantallas (docs.meta, docs['g_' + gid]…).
 // - Todo cambio pasa por change(): devuelve una función que lo deshace (botón «Deshacer»).
 // - Cada documento cambiado se guarda en Firestore pasado un momento (agrupa ráfagas de cambios)
 //   y en una copia local del dispositivo, para arrancar rápido y funcionar sin conexión.
 import { useSyncExternalStore } from 'react'
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
-import { defaultDoc, migrate } from '../lib/model'
+import { defaultDoc, defaultMeta, migrate, uid } from '../lib/model'
 
 let state = {
-  phase: 'loading',   // loading | auth | app
+  phase: 'loading',   // loading | auth | schools | app
   mode: 'local',      // local | connecting | cloud
   user: null,
-  docs: {},
+  raw: {},            // todos los documentos, con su id real
+  sid: null,          // colegio abierto
+  school: null,       // { id, name, format, created } del colegio abierto
+  schools: [],        // lista de colegios
+  docs: {},           // documentos del colegio abierto, sin prefijo
   err: null,
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
   pending: 0
 }
 const listeners = new Set()
-const emit = () => { state = { ...state, pending: dirty.size }; listeners.forEach(f => f()) }
+const SEP = '.'
+const P = id => state.sid + SEP + id
+
+/** Recalcula la vista del colegio abierto a partir de todos los documentos. */
+function derive(next) {
+  const raw = next.raw
+  const schools = (raw.schools && raw.schools.list) || []
+  let sid = next.sid
+  if (sid && !schools.some(s => s.id === sid)) sid = null // borrado desde otro dispositivo
+  const docs = {}
+  if (sid) { const pre = sid + SEP; for (const k in raw) if (k.startsWith(pre) && raw[k] != null) docs[k.slice(pre.length)] = raw[k] }
+  return { ...next, sid, schools, school: schools.find(s => s.id === sid) || null, docs, phase: next.phase === 'app' && !sid ? 'schools' : next.phase }
+}
+const emit = () => { state = { ...derive(state), pending: dirty.size }; listeners.forEach(f => f()) }
 export const subscribe = fn => { listeners.add(fn); return () => listeners.delete(fn) }
 export const getState = () => state
 export const useAppState = () => useSyncExternalStore(subscribe, getState)
@@ -30,12 +51,12 @@ let lsKey = 'eprofy.cache.local'
 let col = null, unsub = null, first = true
 const ver = {}, dirty = new Set(), timers = {}, writing = {}
 
-const cacheLocal = () => { try { localStorage.setItem(lsKey, JSON.stringify(state.docs)) } catch (e) { /* sin espacio o modo privado */ } }
+const cacheLocal = () => { try { localStorage.setItem(lsKey, JSON.stringify(state.raw)) } catch (e) { /* sin espacio o modo privado */ } }
 function loadLocal() {
-  let docs = {}
-  try { const s = localStorage.getItem(lsKey); if (s) docs = JSON.parse(s) || {} } catch (e) { docs = {} }
-  for (const k of Object.keys(docs)) if (docs[k] == null) delete docs[k]
-  return docs
+  let raw = {}
+  try { const s = localStorage.getItem(lsKey); if (s) raw = JSON.parse(s) || {} } catch (e) { raw = {} }
+  for (const k of Object.keys(raw)) if (raw[k] == null) delete raw[k]
+  return raw
 }
 const clean = o => JSON.parse(JSON.stringify(o)) // Firestore no acepta valores undefined
 
@@ -49,7 +70,7 @@ async function flush(id) {
   if (state.mode !== 'cloud' || !col) { dirty.delete(id); emit(); return }
   if (writing[id]) { timers[id] = setTimeout(() => flush(id), 400); return }
   writing[id] = true; emit()
-  const v = ver[id], body = state.docs[id]
+  const v = ver[id], body = state.raw[id]
   try {
     // Sin conexión, Firestore guarda la escritura en su caché y la envía al volver la red.
     if (body == null) await deleteDoc(doc(col, id))
@@ -65,41 +86,51 @@ async function flush(id) {
   } finally { writing[id] = false; emit() }
 }
 
+/** Aplica cambios por id real (null = borrar). */
 function commit(map) {
-  const docs = { ...state.docs }
-  for (const [id, v] of map) { if (v == null) delete docs[id]; else docs[id] = v; queueSave(id) }
-  state = { ...state, docs }
+  const raw = { ...state.raw }
+  for (const [id, v] of map) { if (v == null) delete raw[id]; else raw[id] = v; queueSave(id) }
+  state = { ...state, raw }
   cacheLocal(); emit()
 }
-
-/**
- * Aplica un cambio y devuelve la función que lo deshace.
- *   change(d => { d.meta.events.push(ev); d.g(gid).students.push(s); d.remove('a_' + gid) })
- * d.meta, d.g(gid) y d.a(gid) son copias editables (se crean vacías si no existen).
- */
-export function change(fn) {
+/** Cambio genérico sobre ids reales; devuelve la función que lo deshace. */
+function changeRaw(fn) {
   const touched = new Map(), prev = {}
-  const take = id => {
-    if (!touched.has(id) || touched.get(id) == null) {
-      if (!(id in prev)) prev[id] = state.docs[id]
-      touched.set(id, state.docs[id] != null ? structuredClone(state.docs[id]) : defaultDoc(id))
-    }
-    return touched.get(id)
+  const keep = id => { if (!(id in prev)) prev[id] = state.raw[id] }
+  const r = {
+    take: (id, def) => {
+      if (!touched.has(id) || touched.get(id) == null) { keep(id); touched.set(id, state.raw[id] != null ? structuredClone(state.raw[id]) : def()) }
+      return touched.get(id)
+    },
+    remove: id => { keep(id); touched.set(id, null) },
+    set: (id, value) => { keep(id); touched.set(id, value) }
   }
-  const d = {
-    get meta() { return take('meta') },
-    g: gid => take('g_' + gid),
-    a: gid => take('a_' + gid),
-    doc: id => take(id),
-    remove: id => { if (!(id in prev)) prev[id] = state.docs[id]; touched.set(id, null) },
-    set: (id, value) => { if (!(id in prev)) prev[id] = state.docs[id]; touched.set(id, value) }
-  }
-  fn(d)
+  fn(r)
   commit(touched)
   return () => commit(new Map(Object.entries(prev).map(([id, v]) => [id, v == null ? null : v])))
 }
 
-/** Sustituye todos los datos (importar copia, borrar todo). Devuelve la función para deshacer. */
+/**
+ * Aplica un cambio en el colegio abierto y devuelve la función que lo deshace.
+ *   change(d => { d.meta.events.push(ev); d.g(gid).students.push(s); d.remove('a_' + gid) })
+ * d.meta, d.g(gid) y d.a(gid) son copias editables (se crean vacías si no existen).
+ */
+export function change(fn) {
+  if (!state.sid) return () => {}
+  return changeRaw(r => {
+    const take = id => r.take(P(id), () => defaultDoc(id))
+    fn({
+      get meta() { return take('meta') },
+      g: gid => take('g_' + gid),
+      a: gid => take('a_' + gid),
+      doc: take,
+      remove: id => r.remove(P(id)),
+      set: (id, value) => r.set(P(id), value)
+    })
+  })
+}
+
+/** Sustituye los datos del colegio abierto (importar copia, borrar todo). Devuelve la función para deshacer. */
 export function replaceAll(newDocs) {
   const { docs } = migrate(newDocs)
   return change(d => {
@@ -108,16 +139,54 @@ export function replaceAll(newDocs) {
   })
 }
 
+// ---- colegios ----
+export function openSchool(sid) {
+  state = { ...state, sid, phase: 'app' }
+  try { localStorage.setItem('eprofy.school', sid) } catch (e) { /* */ }
+  emit()
+}
+export function closeSchool() { state = { ...state, sid: null, phase: 'schools' }; emit() }
+export function addSchool({ name, format }) {
+  const id = 'c' + uid()
+  changeRaw(r => {
+    r.take('schools', () => ({ list: [] })).list.push({ id, name, format, created: new Date().toISOString().slice(0, 10) })
+    r.set(id + SEP + 'meta', defaultMeta())
+  })
+  return id
+}
+export const updateSchool = (sid, fields) => changeRaw(r => { Object.assign(r.take('schools', () => ({ list: [] })).list.find(s => s.id === sid), fields) })
+export const deleteSchool = sid => changeRaw(r => {
+  const s = r.take('schools', () => ({ list: [] }))
+  s.list = s.list.filter(x => x.id !== sid)
+  for (const k of Object.keys(state.raw)) if (k.startsWith(sid + SEP)) r.remove(k)
+})
+
 // ---- arranque: local o nube ----
+/** Convierte los datos antiguos (sin colegios) y aplica las migraciones de cada colegio. */
 function applyMigrations() {
-  const { docs, changed } = migrate(state.docs)
-  if (changed.length) { state = { ...state, docs }; changed.forEach(queueSave); cacheLocal() }
+  const raw = { ...state.raw }, changed = new Set()
+  // Datos de antes de existir los colegios: pasan a un colegio «Mi colegio» en formato completo
+  const legacy = Object.keys(raw).filter(k => k === 'meta' || /^[ga]_/.test(k))
+  if (legacy.length) {
+    const id = 'c' + uid()
+    const list = (raw.schools && raw.schools.list) || []
+    raw.schools = { list: [...list, { id, name: 'Mi colegio', format: 'completa', created: new Date().toISOString().slice(0, 10) }] }
+    changed.add('schools')
+    for (const k of legacy) { raw[id + SEP + k] = raw[k]; delete raw[k]; changed.add(k); changed.add(id + SEP + k) }
+  }
+  for (const s of (raw.schools && raw.schools.list) || []) {
+    const pre = s.id + SEP, sub = {}
+    for (const k in raw) if (k.startsWith(pre)) sub[k.slice(pre.length)] = raw[k]
+    const { docs, changed: ch } = migrate(sub)
+    for (const k of ch) { raw[pre + k] = docs[k]; changed.add(pre + k) }
+  }
+  if (changed.size) { state = { ...state, raw }; changed.forEach(queueSave); cacheLocal() }
 }
 
 export function startLocal() {
   stopCloud()
   lsKey = 'eprofy.cache.local'
-  state = { ...state, mode: 'local', user: null, docs: loadLocal(), err: null, phase: 'app' }
+  state = { ...state, mode: 'local', user: null, raw: loadLocal(), sid: null, err: null, phase: 'schools' }
   applyMigrations(); emit()
 }
 
@@ -125,7 +194,7 @@ export function startCloud(user) {
   stopCloud()
   lsKey = 'eprofy.cache.' + user.uid
   first = true; dirty.clear()
-  state = { ...state, mode: 'connecting', user: { uid: user.uid, email: user.email, name: user.displayName }, docs: loadLocal(), err: null, phase: 'app' }
+  state = { ...state, mode: 'connecting', user: { uid: user.uid, email: user.email, name: user.displayName }, raw: loadLocal(), sid: null, err: null, phase: 'schools' }
   emit()
   col = collection(db, 'users', user.uid, 'docs')
   unsub = onSnapshot(col, { includeMetadataChanges: true }, onSnap, err => {
@@ -156,25 +225,25 @@ function onSnap(snap) {
     state = { ...state, mode: 'cloud' }
     if (snap.empty) {
       // Base de datos vacía: se sube lo que hubiera en este dispositivo
-      Object.keys(state.docs).forEach(queueSave)
+      Object.keys(state.raw).forEach(queueSave)
     } else {
       const fresh = {}
       snap.docs.forEach(d => { fresh[d.id] = d.data() })
-      for (const k of Object.keys(state.docs)) if (!(k in fresh) && dirty.has(k)) fresh[k] = state.docs[k]
-      state = { ...state, docs: fresh }
+      for (const k of Object.keys(state.raw)) if (!(k in fresh) && dirty.has(k)) fresh[k] = state.raw[k]
+      state = { ...state, raw: fresh }
     }
     applyMigrations(); cacheLocal(); emit(); return
   }
   let changed = false
-  const docs = { ...state.docs }
+  const raw = { ...state.raw }
   for (const ch of snap.docChanges()) {
     const id = ch.doc.id
     if (dirty.has(id) || writing[id]) continue // nuestra versión local manda hasta que se guarde
-    if (ch.type === 'removed') { if (id in docs) { delete docs[id]; changed = true } continue }
+    if (ch.type === 'removed') { if (id in raw) { delete raw[id]; changed = true } continue }
     const data = ch.doc.data()
-    if (JSON.stringify(data) !== JSON.stringify(docs[id])) { docs[id] = data; changed = true }
+    if (JSON.stringify(data) !== JSON.stringify(raw[id])) { raw[id] = data; changed = true }
   }
-  if (changed) { state = { ...state, docs }; cacheLocal() }
+  if (changed) { state = { ...state, raw }; cacheLocal() }
   emit()
 }
 

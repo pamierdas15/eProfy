@@ -2,6 +2,8 @@ import { useNav } from '../nav'
 import { useModal, useToast } from './ui.jsx'
 import { GroupModal } from '../modals/GroupModals.jsx'
 import { EventModal, BlockModal } from '../modals/CalendarModals.jsx'
+import { PlanModal } from '../modals/ActModal.jsx'
+import { actKind } from '../lib/schedule'
 import { loadSample } from '../lib/sample'
 import { cvar, BLOCK_TYPES } from '../lib/model'
 import { parseISO, MESES, fmtRange } from '../lib/dates'
@@ -43,9 +45,9 @@ export function AgendaItem({ it }) {
     )
   }
   return (
-    <div className="item clickable" onClick={() => it.a.delivery ? go('entregas', { open: it.a.id }) : go('grupos', { gid: it.g.id })}>
+    <div className="item clickable" onClick={() => actKind(it.a) === 'task' ? go('planificador', { open: it.a.id }) : open(<PlanModal kind="exam" gid={it.g.id} aid={it.a.id} />)}>
       <When date={it.date} /><span className="gdot" style={{ '--c': c }} />
-      <div className="grow"><div className="t">{it.a.name}</div><div className="s">{it.a.delivery ? 'Entrega' : it.a.type} · {it.g.name}</div></div>
+      <div className="grow"><div className="t">{it.a.name}</div><div className="s">{actKind(it.a) === 'task' ? 'Entrega · ' + it.a.type : 'Examen' + (it.a.time ? ' · ' + it.a.time : '')} · {it.g.name}</div></div>
     </div>
   )
 }

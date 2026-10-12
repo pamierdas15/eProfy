@@ -1,7 +1,7 @@
 import { useAppState } from '../store/store'
 import * as act from '../store/actions'
 import { Modal, Field, Grade, useModal, useToast } from '../components/ui.jsx'
-import { GCOLORS, cvar } from '../lib/model'
+import { GCOLORS, cvar, isFull } from '../lib/model'
 import { groupDoc, attDoc, groupOf, metaOf, sname, sortedCriteria, critGrades, finalGrade, attCounts, fmtW, parseNum } from '../lib/grades'
 import { todayISO, fmtDay } from '../lib/dates'
 
@@ -63,6 +63,7 @@ export function StudentModal({ gid, sid }) {
         <Field label="Nombre" id="f_sname"><input id="f_sname" name="name" defaultValue={s.name} /></Field>
         <Field label="Apellidos" id="f_ssur"><input id="f_ssur" name="surname" defaultValue={s.surname} /></Field>
       </div>
+      {isFull(st.school) ? <>
       <div>
         <div className="label" style={{ marginBottom: 6 }}>Calificación por criterios</div>
         {cs.length ? (
@@ -77,6 +78,7 @@ export function StudentModal({ gid, sid }) {
         ) : <p className="muted">Sin criterios definidos.</p>}
       </div>
       <div className="row"><span className="label">Asistencia del curso</span><span className="tag warn">F {c.F}</span><span className="tag amber">R {c.R}</span><span className="tag">J {c.J}</span></div>
+      </> : null}
       <div>
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
           <span className="label">Anotaciones</span>

@@ -1,6 +1,7 @@
 // Modelo de datos de eProfy y migraciones.
 //
-// Todo se guarda como documentos JSON (en Firestore: users/{uid}/docs/{id}):
+// Cada colegio guarda sus datos como documentos JSON (en Firestore: users/{uid}/docs/<colegio>.<id>;
+// la lista de colegios está en users/{uid}/docs/schools). Dentro de un colegio:
 //   meta        → grupos, horario semanal, eventos, días no lectivos, cambios puntuales y ajustes
 //   g_<grupo>   → alumnos, criterios, actividades, notas y entregas de un grupo
 //   a_<grupo>   → asistencia y anotaciones de un grupo
@@ -10,7 +11,7 @@
 
 export const SCHEMA = 2
 /** Versión visible de la app (se muestra en Ajustes). */
-export const APP_VERSION = 'Prueba 03'
+export const APP_VERSION = 'Prueba 05'
 
 export const defaultTrims = () => [
   { start: '2026-09-08', end: '2026-12-22' },
@@ -71,7 +72,31 @@ export const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toS
 export const GCOLORS = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6']
 export const cvar = c => `var(--${c || 'g1'})`
 export const ACT_TYPES = ['Examen', 'Tarea', 'Proyecto', 'Práctica', 'Exposición', 'Cuaderno', 'Observación', 'Otro']
-export const EV_TYPES = ['Examen', 'Excursión', 'Reunión', 'Evaluación', 'Claustro', 'Recordatorio', 'Otro']
+export const EV_TYPES = ['Excursión', 'Reunión', 'Evaluación', 'Claustro', 'Actividad del centro', 'Recordatorio', 'Otro']
+/** Tipos de tarea del planificador (las tareas son actividades del grupo con fechas de disponibilidad). */
+export const TASK_TYPES = ['Tarea', 'Proyecto', 'Práctica', 'Trabajo', 'Lectura', 'Exposición', 'Otro']
+export const TASK_FORMATS = ['En papel', 'Digital', 'Aula virtual', 'Presencial en clase', 'Oral', 'Otro']
+
+/**
+ * Formatos de la app, elegidos al crear cada colegio.
+ * `tabs`: pestañas que se ven (Ajustes va siempre en la rueda dentada de arriba).
+ */
+export const FORMATS = {
+  reducida: {
+    label: 'Reducida',
+    tabs: ['hoy', 'grupos', 'horario', 'planificador'],
+    desc: 'Para organizar las clases sin calificar en la app: horario, grupos y alumnos, calendario de exámenes y entregas, y planificador de tareas.',
+    points: ['Hoy, Grupos, Horario y Planificador', 'Sin cuaderno de notas ni pasar lista', 'Ideal si el centro usa otra plataforma para evaluar']
+  },
+  completa: {
+    label: 'Completa',
+    tabs: ['hoy', 'grupos', 'notas', 'lista', 'horario', 'planificador'],
+    desc: 'Todo lo de la Reducida más el cuaderno de notas por criterios LOMLOE y el control de asistencia.',
+    points: ['Todo lo de la Reducida', 'Notas: cuaderno por criterios, medias y exportación a Excel', 'Asistencia: faltas, retrasos y anotaciones']
+  }
+}
+export const formatOf = school => FORMATS[(school && school.format) || 'completa'] || FORMATS.completa
+export const isFull = school => !school || school.format !== 'reducida'
 export const ATT = { P: 'Presente', F: 'Falta', R: 'Retraso', J: 'Justificada' }
 export const DLV = { '': 'Pendiente', E: 'Entregado', T: 'Fuera de plazo', N: 'No entregado' }
 export const BLOCK_TYPES = {

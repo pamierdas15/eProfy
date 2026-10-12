@@ -4,7 +4,8 @@ import * as act from '../store/actions'
 import { Modal, Field, useModal, useToast } from '../components/ui.jsx'
 import { EV_TYPES, BLOCK_TYPES } from '../lib/model'
 import { metaOf, groupOf, groupDoc, trimOf } from '../lib/grades'
-import { classesOn } from '../lib/schedule'
+import { classesOn, actKind } from '../lib/schedule'
+import { PlanModal } from './ActModal.jsx'
 import { todayISO, DIAS, addDays, diffDays, fmtShort, fmtLong } from '../lib/dates'
 import { exportExcel } from '../lib/excel'
 
@@ -14,6 +15,24 @@ const GroupSelect = ({ meta, name, value, none, id }) => (
     {meta.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
   </select>
 )
+
+/* ---------- añadir al calendario ---------- */
+export function AddModal({ date }) {
+  const { open } = useModal()
+  const opts = [
+    ['Examen', 'Fecha, contenidos y material permitido. Sale en el calendario.', () => open(<PlanModal kind="exam" date={date} />)],
+    ['Tarea o proyecto', 'Con fechas de disponibilidad, instrucciones, formato y control de entregas.', () => open(<PlanModal kind="task" date={date} />)],
+    ['Otro evento', 'Excursión, reunión, sesión de evaluación, actividad del centro…', () => open(<EventModal date={date} />)],
+    ['Día no lectivo', 'Festivo, vacaciones o ausencia: ese día no aparecen clases.', () => open(<BlockModal date={date} />)]
+  ]
+  return (
+    <Modal title={'Añadir · ' + fmtLong(date || todayISO())}>
+      <div className="choose">{opts.map(([t, d, fn]) => (
+        <button type="button" key={t} className="choose-opt" onClick={fn}><b>{t}</b><span>{d}</span></button>
+      ))}</div>
+    </Modal>
+  )
+}
 
 /* ---------- eventos ---------- */
 export function EventModal({ id, date }) {
@@ -85,7 +104,7 @@ export function BlockModal({ id, date }) {
     classesOn(meta, d).filter(c => !c.cancelled).forEach(c => classes.push(c))
   }
   for (const g of meta.groups) for (const a of groupDoc(st.docs, g.id).activities) {
-    if (a.date && a.date >= range.start && a.date <= range.end && (a.delivery || a.type === 'Examen')) acts.push({ a, g })
+    if (a.date && a.date >= range.start && a.date <= range.end && actKind(a) !== 'grade') acts.push({ a, g })
   }
   const del = () => { const undo = act.deleteBlock(id); close(); toast('Día no lectivo eliminado', undo) }
   return (
@@ -107,7 +126,7 @@ export function BlockModal({ id, date }) {
       {classes.length || acts.length ? (
         <div className="affected" role="status">
           {classes.length ? <div><b>{classes.length}</b> clase{classes.length === 1 ? '' : 's'} del horario no se darán{days === 1 ? ': ' + classes.map(c => (groupOf(st.docs, c.groupId) || {}).name + ' ' + c.start).join(', ') : ''}.</div> : null}
-          {acts.map(({ a, g }) => <div key={a.id}>⚠ {a.delivery ? 'Entrega' : 'Examen'} «{a.name}» de {g.name} el {fmtShort(a.date)}: quizá quieras cambiar la fecha.</div>)}
+          {acts.map(({ a, g }) => <div key={a.id}>⚠ {actKind(a) === 'exam' ? 'Examen' : 'Entrega'} «{a.name}» de {g.name} el {fmtShort(a.date)}: quizá quieras cambiar la fecha.</div>)}
         </div>
       ) : null}
     </Modal>

@@ -24,7 +24,11 @@ export function loadSample() {
       const C = Object.fromEntries(gd.criteria.map(c => [c.code, c.id]))
       acts.forEach(([name, type, off, codes, delivery]) => {
         const date = addDays(t, off)
-        const a = { id: uid(), name, type, date, trim: trimOf(meta0, date), max: 10, weight: 1, criteria: codes.map(k => C[k]), delivery }
+        const full = !getState().school || getState().school.format !== 'reducida'
+        const a = { id: uid(), name, type, date, trim: trimOf(meta0, date), max: 10, weight: 1, criteria: codes.map(k => C[k]), delivery,
+          kind: type === 'Examen' ? 'exam' : delivery ? 'task' : 'grade', graded: full }
+        if (a.kind === 'task') Object.assign(a, { start: addDays(date, type === 'Proyecto' ? -21 : -7), format: type === 'Práctica' ? 'Presencial en clase' : 'Digital', grouping: type === 'Proyecto' ? 'Grupos' : 'Individual', duration: type === 'Proyecto' ? '4 sesiones' : '1 sesión + casa', desc: 'Ejemplo: instrucciones de la tarea, pasos a seguir y cómo se valora.', materials: type === 'Proyecto' ? 'Palillos, cola blanca, plantilla en el aula virtual' : 'Ficha en el aula virtual' })
+        if (a.kind === 'exam') Object.assign(a, { desc: 'Ejemplo: contenidos que entran en el examen.', materials: 'Calculadora' })
         gd.activities.push(a)
         if (off <= 0) { gd.scores[a.id] = {}; gd.students.forEach((s, i) => { const base = 4 + ((i * 37) % 6) + rnd() * 1.6; gd.scores[a.id][s.id] = Math.min(10, Math.round(base * 2) / 2) }) }
         if (delivery) { gd.delivery[a.id] = {}; gd.students.forEach((s, i) => { if (off < 0 || i % 3 === 0) gd.delivery[a.id][s.id] = i % 7 === 3 ? 'N' : i % 5 === 1 ? 'T' : 'E' }) }

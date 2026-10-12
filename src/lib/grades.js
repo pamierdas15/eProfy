@@ -32,8 +32,9 @@ export const sortedCriteria = g => [...g.criteria].sort((a, b) => a.code.localeC
 
 // ---- notas ----
 export function score(g, aid, sid) { const v = g.scores[aid] && g.scores[aid][sid]; return typeof v === 'number' ? v : null }
+/** Actividades que cuentan en el cuaderno de notas (las tareas y exámenes marcados como no calificables no salen). */
 export function actsIn(g, trim) {
-  return g.activities.filter(a => !trim || a.trim === trim)
+  return g.activities.filter(a => a.graded !== false && (!trim || a.trim === trim))
     .sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.name.localeCompare(b.name))
 }
 /**
@@ -45,7 +46,7 @@ export function critGrades(g, sid, trim) {
   for (const c of g.criteria) {
     let s = 0, w = 0
     for (const a of g.activities) {
-      if (trim && a.trim !== trim) continue
+      if (a.graded === false || (trim && a.trim !== trim)) continue
       if (!(a.criteria || []).includes(c.id)) continue
       const v = score(g, a.id, sid); if (v == null) continue
       const aw = Number(a.weight) || 1

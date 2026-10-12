@@ -37,12 +37,27 @@ export function classesOn(meta, date) {
   return out.sort((a, b) => a.start.localeCompare(b.start))
 }
 
+/**
+ * Tipo de actividad del grupo:
+ *   'task' → tarea del planificador (con fechas de disponibilidad y, si se quiere, control de entregas)
+ *   'exam' → examen (sale en el calendario)
+ *   'grade'→ otra actividad calificable (solo en Notas)
+ */
+export const actKind = a => a.kind || (a.type === 'Examen' ? 'exam' : a.delivery ? 'task' : 'grade')
+/** Estado de una tarea según sus fechas: programada (aún no disponible), abierta o cerrada (pasó la entrega). */
+export function taskStatus(a, today) {
+  if (actKind(a) !== 'task') return null
+  if (a.date && a.date < today) return 'cerrada'
+  if (a.start && a.start > today) return 'programada'
+  return 'abierta'
+}
+
 /** Eventos, exámenes y entregas entre dos fechas, más los días no lectivos que se solapan. */
 export function agenda(docs, from, to) {
   const meta = metaOf(docs), out = []
   for (const e of meta.events) if (e.date >= from && e.date <= to) out.push({ kind: 'ev', date: e.date, time: e.time || '', e, g: groupOf(docs, e.groupId) })
   for (const g of meta.groups) for (const a of groupDoc(docs, g.id).activities) {
-    if (a.date && a.date >= from && a.date <= to && (a.delivery || a.type === 'Examen')) out.push({ kind: 'act', date: a.date, time: '', a, g })
+    if (a.date && a.date >= from && a.date <= to && actKind(a) !== 'grade') out.push({ kind: 'act', date: a.date, time: '', a, g })
   }
   for (const b of meta.blocked || []) {
     if ((b.end || b.start) >= from && b.start <= to) out.push({ kind: 'block', date: b.start < from ? from : b.start, time: '', b })

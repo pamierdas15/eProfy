@@ -4,11 +4,11 @@ import { useNav } from '../nav'
 import { useModal } from '../components/ui.jsx'
 import { ClassCard } from '../components/ClassCard.jsx'
 import { NoGroups, AgendaItem } from '../components/common.jsx'
-import { ActModal } from '../modals/ActModal.jsx'
-import { EventModal, ClassModal, BlockModal, ExcelModal } from '../modals/CalendarModals.jsx'
+import { PlanModal } from '../modals/ActModal.jsx'
+import { AddModal, ClassModal, BlockModal, ExcelModal } from '../modals/CalendarModals.jsx'
 import { metaOf, groupDoc, trimOf } from '../lib/grades'
-import { classesOn, blockedOn, agenda } from '../lib/schedule'
-import { cvar, BLOCK_TYPES } from '../lib/model'
+import { classesOn, blockedOn, agenda, actKind, taskStatus } from '../lib/schedule'
+import { cvar, BLOCK_TYPES, isFull } from '../lib/model'
 import { todayISO, addDays, diffDays, weekday, mondayOf, parseISO, DIAS, DIAS_CORTOS, MESES, fmtDay, fmtRange } from '../lib/dates'
 import { exportJson } from '../lib/excel'
 import * as act from '../store/actions'
@@ -37,8 +37,8 @@ export default function Hoy({ params }) {
         <div className="hero-date">{DIAS[weekday(sel)]} <span>{d.getDate()}</span> de {MESES[d.getMonth()]}</div>
       </div>
       <div className="row">
-        <button className="btn" onClick={() => open(<EventModal date={sel} />)}>+ Evento</button>
-        <button className="btn primary" onClick={() => open(<ActModal delivery />)}>+ Tarea</button>
+        <button className="btn" onClick={() => open(<AddModal date={sel} />)}>+ Añadir al calendario</button>
+        <button className="btn primary" onClick={() => open(<PlanModal kind="task" />)}>+ Tarea</button>
       </div>
     </div>
   )
@@ -50,7 +50,7 @@ export default function Hoy({ params }) {
       <div className="grow"><b>{due > 0 ? 'Hace ' + due + ' días que no haces una copia de seguridad' : 'Todavía no has hecho ninguna copia de seguridad'}</b>
         <span className="muted" style={{ fontSize: '.88rem' }}>Descarga una copia para tener tus notas y la asistencia también fuera de la app.</span></div>
       <button className="btn primary sm" onClick={() => { exportJson(st.docs); act.markBackup() }}>Hacer copia ahora</button>
-      <button className="btn sm" onClick={() => open(<ExcelModal />)}>Notas a Excel</button>
+      {isFull(st.school) ? <button className="btn sm" onClick={() => open(<ExcelModal />)}>Notas a Excel</button> : null}
       <button className="btn ghost sm" onClick={() => { try { localStorage.setItem('eprofy.backupSnooze', addDays(t, 7)) } catch (e) { /* */ } force(x => x + 1) }}>Recordar en una semana</button>
     </div>
   ) : null
@@ -96,15 +96,21 @@ export default function Hoy({ params }) {
   )
 
   const up = agenda(st.docs, t, addDays(t, 14))
-  const pend = []
+  // Tareas abiertas del planificador y entregas vencidas que aún tienen alumnos sin entregar
+  const open_ = [], pend = []
   for (const g of meta.groups) {
     const gd = groupDoc(st.docs, g.id)
     for (const a of gd.activities) {
-      if (!a.delivery || !a.date || a.date > t || diffDays(a.date, t) > 45) continue
-      const miss = gd.students.filter(s => !(gd.delivery[a.id] || {})[s.id] || gd.delivery[a.id][s.id] === 'N').length
-      if (miss) pend.push({ g, a, miss })
+      if (actKind(a) !== 'task') continue
+      const s = taskStatus(a, t)
+      if (s === 'abierta') open_.push({ g, a })
+      else if (s === 'cerrada' && a.delivery && diffDays(a.date, t) <= 30) {
+        const miss = gd.students.filter(x => !(gd.delivery[a.id] || {})[x.id] || gd.delivery[a.id][x.id] === 'N').length
+        if (miss) pend.push({ g, a, miss })
+      }
     }
   }
+  open_.sort((x, y) => x.a.date.localeCompare(y.a.date))
   pend.sort((x, y) => y.a.date.localeCompare(x.a.date))
 
   return (
@@ -124,18 +130,30 @@ export default function Hoy({ params }) {
         </section>
         <section className="stack">
           <div className="panel">
-            <div className="panel-h"><h2>Próximos 14 días</h2><button className="btn ghost sm" onClick={() => go('calendario')}>Calendario</button></div>
+            <div className="panel-h"><h2>Próximos 14 días</h2><button className="btn ghost sm" onClick={() => go('planificador')}>Planificador</button></div>
             {up.length ? <div className="list">{up.map((it, i) => <AgendaItem key={i} it={it} />)}</div> : <p className="muted">Nada programado en las próximas dos semanas.</p>}
           </div>
           <div className="panel">
-            <div className="panel-h"><h2>Entregas por revisar</h2></div>
-            {pend.length ? <div className="list">{pend.slice(0, 8).map(p => (
-              <div key={p.a.id} className="item clickable" onClick={() => go('entregas', { open: p.a.id })}>
-                <span className="gdot" style={{ '--c': cvar(p.g.color) }} />
-                <div className="grow"><div className="t">{p.a.name}</div><div className="s">{p.g.name} · venció el {fmtDay(p.a.date)}</div></div>
-                <span className="tag warn">{p.miss} sin entregar</span>
-              </div>
-            ))}</div> : <p className="muted">Todas las entregas vencidas están al día.</p>}
+            <div className="panel-h"><h2>Tareas abiertas</h2><button className="btn ghost sm" onClick={() => open(<PlanModal kind="task" />)}>+ Tarea</button></div>
+            {open_.length || pend.length ? <div className="list">
+              {open_.slice(0, 8).map(p => {
+                const dd = diffDays(t, p.a.date)
+                return (
+                  <div key={p.a.id} className="item clickable" onClick={() => go('planificador', { open: p.a.id })}>
+                    <span className="gdot" style={{ '--c': cvar(p.g.color) }} />
+                    <div className="grow"><div className="t">{p.a.name}</div><div className="s">{p.g.name} · {p.a.type} · entrega el {fmtDay(p.a.date)}</div></div>
+                    <span className={'tag ' + (dd <= 2 ? 'amber' : '')}>{dd === 0 ? 'Hoy' : 'Faltan ' + dd + ' d'}</span>
+                  </div>
+                )
+              })}
+              {pend.slice(0, 6).map(p => (
+                <div key={p.a.id} className="item clickable" onClick={() => go('planificador', { open: p.a.id })}>
+                  <span className="gdot" style={{ '--c': cvar(p.g.color) }} />
+                  <div className="grow"><div className="t">{p.a.name}</div><div className="s">{p.g.name} · venció el {fmtDay(p.a.date)}</div></div>
+                  <span className="tag warn">{p.miss} sin entregar</span>
+                </div>
+              ))}
+            </div> : <p className="muted">No hay tareas abiertas. Créalas en el Planificador.</p>}
           </div>
         </section>
       </div>

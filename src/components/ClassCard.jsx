@@ -4,7 +4,7 @@ import * as act from '../store/actions'
 import { useNav } from '../nav'
 import { useModal, useToast } from './ui.jsx'
 import { ClassModal } from '../modals/CalendarModals.jsx'
-import { cvar } from '../lib/model'
+import { cvar, isFull } from '../lib/model'
 import { groupOf, attDoc } from '../lib/grades'
 import { fmtShort, todayISO, nowHM } from '../lib/dates'
 
@@ -39,7 +39,7 @@ export function ClassCard({ cls }) {
           {cls.added && cls.movedFrom ? <span className="tag amber">Movida desde el {fmtShort(cls.movedFrom)}</span> : null}
           {cls.added && !cls.movedFrom ? <span className="tag amber">Clase puntual</span> : null}
           {cls.reason ? <span className="tag">{cls.reason}</span> : null}
-          {done && !cls.cancelled ? <span className="tag">Lista pasada</span> : null}
+          {done && !cls.cancelled && isFull(st.school) ? <span className="tag">Lista pasada</span> : null}
         </div>
       </div>
       <div className="row acts">
@@ -47,8 +47,10 @@ export function ClassCard({ cls }) {
           <button className="btn sm" onClick={() => toast('Clase restaurada', act.restoreClass(cls))}>Restaurar clase</button>
         ) : (
           <>
-            <button className={'btn sm ' + (done ? '' : 'primary')} onClick={() => go('lista', { gid: g.id, date: cls.date })}>Pasar lista</button>
-            <button className="btn sm" onClick={() => go('grupos', { gid: g.id })}>Cuaderno</button>
+            {isFull(st.school) ? <>
+              <button className={'btn sm ' + (done ? '' : 'primary')} onClick={() => go('lista', { gid: g.id, date: cls.date })}>Pasar lista</button>
+              <button className="btn sm" onClick={() => go('notas', { gid: g.id })}>Notas</button>
+            </> : <button className="btn sm" onClick={() => go('grupos', { gid: g.id })}>Ver grupo</button>}
             <div className="menu" ref={ref}>
               <button className="btn sm ghost" aria-haspopup="menu" aria-expanded={menu} aria-label="Más acciones" onClick={() => setMenu(m => !m)}>⋯</button>
               {menu ? (

@@ -2,21 +2,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { NavCtx } from './nav'
 import { onAuthStateChanged, getRedirectResult, signOut as fbSignOut } from 'firebase/auth'
 import { auth, configured } from './firebase'
-import { useAppState, startLocal, startCloud, stopCloud, setPhase, hasPendingWrites } from './store/store'
+import { useAppState, startLocal, startCloud, stopCloud, setPhase, hasPendingWrites, closeSchool } from './store/store'
 import { useLayout } from './lib/layout'
+import { formatOf } from './lib/model'
 import { Icon, useToast, InstallButton } from './components/ui.jsx'
-import Login, { authMsg } from './views/Login.jsx'
+import { Login, Colegios, authMsg } from './views/Acceso.jsx'
 import Hoy from './views/Hoy.jsx'
 import Grupos from './views/Grupos.jsx'
+import Notas from './views/Notas.jsx'
 import Asistencia from './views/Asistencia.jsx'
-import Entregas from './views/Entregas.jsx'
-import Calendario from './views/Calendario.jsx'
 import Horario from './views/Horario.jsx'
+import Planificador from './views/Planificador.jsx'
 import Ajustes from './views/Ajustes.jsx'
 
-export const VIEWS = [['hoy', 'Hoy'], ['grupos', 'Grupos'], ['lista', 'Asistencia'], ['entregas', 'Entregas'], ['calendario', 'Calendario'], ['horario', 'Horario'], ['ajustes', 'Ajustes']]
-const VIEW_CMP = { hoy: Hoy, grupos: Grupos, lista: Asistencia, entregas: Entregas, calendario: Calendario, horario: Horario, ajustes: Ajustes }
-
+const TAB_LABEL = { hoy: 'Hoy', grupos: 'Grupos', notas: 'Notas', lista: 'Asistencia', horario: 'Horario', planificador: 'Planificador' }
+const VIEW_CMP = { hoy: Hoy, grupos: Grupos, notas: Notas, lista: Asistencia, horario: Horario, planificador: Planificador, ajustes: Ajustes }
 
 const LOCAL_KEY = 'eprofy.localMode'
 const readView = () => { try { const v = localStorage.getItem('eprofy.view'); return VIEW_CMP[v] ? v : 'hoy' } catch (e) { return 'hoy' } }
@@ -32,6 +32,9 @@ export default function App() {
     try { localStorage.setItem('eprofy.view', view) } catch (e) { /* */ }
     window.scrollTo(0, 0)
   }, [])
+
+  // Al abrir un colegio se empieza siempre en «Hoy»
+  useEffect(() => { if (st.sid) go('hoy') }, [st.sid, go])
 
   // ---- acceso ----
   useEffect(() => {
@@ -58,31 +61,41 @@ export default function App() {
 
   if (st.phase === 'loading') return <div className="auth"><div className="brand"><div className="brand-mark">e</div><b>eProfy</b></div></div>
   if (st.phase === 'auth') return <Login error={authErr} onError={setAuthErr} onLocal={useLocal} />
+  if (st.phase === 'schools' || !st.school) return <Colegios onSignOut={signOut} />
 
-  const View = VIEW_CMP[nav.view] || Hoy
+  // Pestañas según el formato del colegio (Reducida o Completa). Ajustes va en la rueda dentada.
+  const tabs = formatOf(st.school).tabs
+  const view = nav.view === 'ajustes' || tabs.includes(nav.view) ? nav.view : 'hoy'
+  const View = VIEW_CMP[view]
   return (
-    <NavCtx.Provider value={{ ...nav, go, signOut }}>
+    <NavCtx.Provider value={{ ...nav, view, go, signOut, tabs }}>
       <div className="app">
         <aside className="side">
           <div className="brand"><div className="brand-mark">e</div><b>eProfy</b></div>
           <nav className="nav">
-            {VIEWS.map(([k, l]) => (
-              <button key={k} aria-current={nav.view === k ? 'page' : undefined} onClick={() => go(k)}><Icon name={k} /><span>{l}</span></button>
+            {tabs.map(k => (
+              <button key={k} aria-current={view === k ? 'page' : undefined} onClick={() => go(k)}><Icon name={k} /><span>{TAB_LABEL[k]}</span></button>
             ))}
           </nav>
           <SyncStatus st={st} />
         </aside>
         <main>
           <div className="topbar">
-            <div className="left"><div className="brand"><div className="brand-mark">e</div><b>eProfy</b></div><SyncStatus st={st} /></div>
+            <div className="left">
+              <button className="school-switch" onClick={closeSchool} title="Cambiar de colegio">
+                <Icon name="colegio" size={18} /><span className="school-name">{st.school.name}</span><span className="tag school-fmt">{formatOf(st.school).label}</span>
+              </button>
+              <SyncStatus st={st} />
+            </div>
             <InstallButton className="btn sm primary tb-install" />
-            <div className="seg layout-seg" role="group" aria-label="Formato de la app">
+            <div className="seg layout-seg" role="group" aria-label="Formato de pantalla">
               {[['auto', 'Automático'], ['mobile', 'Móvil'], ['desktop', 'PC']].map(([k, l]) => (
-                <button key={k} aria-pressed={layout === k} title={'Formato ' + l} onClick={() => setLayout(k)}><Icon name={k} size={16} /><span className="lt">{l}</span></button>
+                <button key={k} aria-pressed={layout === k} title={'Pantalla ' + l} onClick={() => setLayout(k)}><Icon name={k} size={16} /><span className="lt">{l}</span></button>
               ))}
             </div>
+            <button className={'gear' + (view === 'ajustes' ? ' on' : '')} aria-label="Ajustes" title="Ajustes" aria-pressed={view === 'ajustes'} onClick={() => go(view === 'ajustes' ? 'hoy' : 'ajustes')}><Icon name="ajustes" size={20} /></button>
           </div>
-          <View key={nav.view + nav.n} params={nav.params} />
+          <View key={view + nav.n} params={nav.params} />
         </main>
       </div>
     </NavCtx.Provider>

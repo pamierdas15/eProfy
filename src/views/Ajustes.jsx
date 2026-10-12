@@ -1,4 +1,4 @@
-import { useAppState, replaceAll } from '../store/store'
+import { useAppState, replaceAll, closeSchool } from '../store/store'
 import * as act from '../store/actions'
 import { useNav } from '../nav'
 import { useModal, useToast, Confirm, InstallButton } from '../components/ui.jsx'
@@ -9,7 +9,8 @@ import { loadSample } from '../lib/sample'
 import { exportJson } from '../lib/excel'
 import { metaOf, trimOf } from '../lib/grades'
 import { todayISO, fmtLong } from '../lib/dates'
-import { APP_VERSION } from '../lib/model'
+import { APP_VERSION, formatOf, isFull } from '../lib/model'
+import { SchoolModal } from './Acceso.jsx'
 
 export default function Ajustes() {
   const st = useAppState(), { signOut } = useNav(), { open } = useModal(), toast = useToast()
@@ -40,8 +41,18 @@ export default function Ajustes() {
 
   return (
     <>
-      <div className="top"><div><h1>Ajustes</h1><div className="sub">Curso, trimestres, cuenta y copias de seguridad · eProfy {APP_VERSION}</div></div></div>
+      <div className="top"><div><h1>Ajustes</h1><div className="sub">Colegio, curso, cuenta y copias de seguridad · eProfy {APP_VERSION}</div></div></div>
       <div className="grid2">
+        <div className="stack">
+        <div className="panel">
+          <h2 style={{ marginBottom: 8 }}>Colegio</h2>
+          <p style={{ margin: '0 0 4px' }}><b>{st.school.name}</b> · versión <b>{formatOf(st.school).label}</b></p>
+          <p className="muted" style={{ margin: '0 0 12px' }}>{formatOf(st.school).desc}</p>
+          <div className="row">
+            <button className="btn" onClick={() => open(<SchoolModal sid={st.school.id} />)}>Cambiar nombre o formato</button>
+            <button className="btn" onClick={closeSchool}>Cambiar de colegio</button>
+          </div>
+        </div>
         <div className="panel">
           <h2 style={{ marginBottom: 12 }}>Trimestres</h2>
           <form className="stack" onSubmit={saveTrims} key={JSON.stringify(T)}>
@@ -53,7 +64,8 @@ export default function Ajustes() {
             ))}
             <div><button className="btn primary">Guardar trimestres</button></div>
           </form>
-          <p className="legend">Las actividades nuevas se asignan al trimestre según su fecha. Los festivos y vacaciones se añaden en Calendario → Bloquear días.</p>
+          <p className="legend">Las actividades nuevas se asignan al trimestre según su fecha. Los días no lectivos se añaden en Planificador → Añadir → Día no lectivo.</p>
+        </div>
         </div>
         <div className="stack">
           <div className="panel">
@@ -87,19 +99,19 @@ export default function Ajustes() {
             <p className="muted" style={{ margin: '0 0 12px' }}>{meta.settings.lastBackup ? 'Última copia: ' + fmtLong(meta.settings.lastBackup) + '.' : 'Aún no has hecho ninguna copia.'}</p>
             <div className="row">
               <button className="btn primary" onClick={doExport}>Exportar copia (JSON)</button>
-              <button className="btn" onClick={() => open(<ExcelModal />)}>Exportar notas a Excel</button>
+              {isFull(st.school) ? <button className="btn" onClick={() => open(<ExcelModal />)}>Exportar notas a Excel</button> : null}
               <label className="btn" htmlFor="importFile">Importar copia</label>
               <input type="file" id="importFile" accept="application/json,.json" hidden onChange={doImport} />
             </div>
-            <p className="legend">La copia JSON guarda todo y sirve para restaurar la app. El Excel es para las sesiones de evaluación y para pasar notas a Plumier.</p>
+            <p className="legend">La copia JSON guarda todo lo de este colegio y sirve para restaurarlo.{isFull(st.school) ? ' El Excel es para las sesiones de evaluación y para pasar notas a Plumier.' : ''}</p>
           </div>
           <div className="panel">
             <h2 style={{ marginBottom: 12 }}>Datos</h2>
             <div className="row">
               <button className="btn" onClick={() => toast('Grupos de ejemplo añadidos', loadSample())}>Añadir grupos de ejemplo</button>
-              <button className="btn danger" onClick={() => open(<Confirm title="Borrar todos los datos" label="Borrar todo"
-                message="Se borrarán todos los grupos, notas, asistencia, eventos, días no lectivos y el horario, en todos tus dispositivos. Podrás deshacerlo justo después, pero conviene exportar antes una copia."
-                onYes={() => toast('Datos borrados', act.wipeAll())} />)}>Borrar todos los datos</button>
+              <button className="btn danger" onClick={() => open(<Confirm title="Vaciar este colegio" label="Vaciar colegio"
+                message="Se borrarán los grupos, alumnos, notas, asistencia, tareas, eventos, días no lectivos y el horario de este colegio, en todos tus dispositivos. Tus otros colegios no se tocan. Podrás deshacerlo justo después, pero conviene exportar antes una copia."
+                onYes={() => toast('Datos borrados', act.wipeAll())} />)}>Vaciar este colegio</button>
             </div>
           </div>
         </div>

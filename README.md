@@ -1,6 +1,11 @@
-# eProfy (React + Vite) · versión Prueba 03
+# eProfy (React + Vite) · versión Prueba 05
 
-Cuaderno del profesor para el instituto: notas por criterios LOMLOE, asistencia, tareas y entregas, calendario con días no lectivos, horario semanal con cambios puntuales, exportación a Excel y copias de seguridad. Es una PWA instalable que se adapta al móvil y al PC y sincroniza los datos con Firebase.
+Cuaderno del profesor para el instituto. Cada usuario tiene sus **colegios**, y cada colegio usa una de dos versiones:
+
+- **Reducida:** Hoy, Grupos, Horario y Planificador (calendario mensual + planificador de tareas).
+- **Completa:** lo mismo más Notas (cuaderno por criterios LOMLOE) y Asistencia.
+
+Ajustes se abre con la rueda dentada de arriba. Incluye días no lectivos, cambios puntuales de clase, exportación a Excel y copias de seguridad. Es una PWA instalable que se adapta al móvil y al PC y sincroniza los datos con Firebase.
 
 Todo funciona con planes gratuitos: GitHub Free, Vercel Hobby y Firebase Spark.
 
@@ -50,6 +55,12 @@ git push -u origin main
 
 1. En **vercel.com**, pulsa *Add New → Project*, elige `eprofy` y pulsa **Deploy**. Vercel detecta Vite solo: *Build Command* `npm run build` y *Output Directory* `dist`.
 2. En Firebase, ve a *Authentication → Configuración → Dominios autorizados* y añade tu dominio de Vercel, por ejemplo `eprofy.vercel.app`.
+3. Para que funcione **«Continuar con Google»**, el inicio de sesión pasa por tu propio dominio (`vercel.json` reenvía `/__/auth` a Firebase). Hay que autorizarlo una vez en Google Cloud:
+   - Entra en **console.cloud.google.com**, elige el proyecto `eprofy`, y ve a *APIs y servicios → Credenciales*.
+   - Abre **«Web client (auto created by Google Service)»**.
+   - En *Orígenes autorizados de JavaScript*, añade `https://TU-DOMINIO.vercel.app`.
+   - En *URI de redireccionamiento autorizados*, añade `https://TU-DOMINIO.vercel.app/__/auth/handler`.
+   - Pulsa **Guardar** y espera unos minutos.
 
 Cada `git push` a `main` publica una versión nueva automáticamente.
 
@@ -72,6 +83,8 @@ eProfy indica en **Ajustes → Cuenta y sincronización** qué falta. La app sie
 | «Este dominio no está autorizado» | Añade tu dominio de Vercel en Authentication → Configuración → Dominios autorizados. |
 | «La base de datos no existe todavía» | Crea la base de datos en Firestore Database (paso 1.2). |
 | «Firebase no deja leer los datos» | Publica las reglas de `firestore.rules` (paso 1.3). |
+| Google abre una página con «redirect_uri_mismatch» | Falta el paso 2.3: añadir tu dominio en Google Cloud → Credenciales. |
+| Pulsas «Continuar con Google» y no pasa nada | Revisa los pasos 2.2 y 2.3. Mientras tanto puedes entrar con correo y contraseña. |
 | «La apiKey no es válida» | Vuelve a copiar `firebaseConfig` desde la consola de Firebase. |
 
 
@@ -79,10 +92,12 @@ eProfy indica en **Ajustes → Cuenta y sincronización** qué falta. La app sie
 
 ## Notas técnicas
 
-- **Datos:** se guardan como documentos JSON en `users/{uid}/docs/{id}` (ver `src/lib/model.js`):
-  - `meta`: grupos, horario, eventos, días no lectivos, cambios puntuales y ajustes.
-  - `g_<grupo>`: alumnos, criterios, actividades, notas y entregas.
-  - `a_<grupo>`: asistencia y anotaciones.
+- **Datos:** se guardan como documentos JSON en `users/{uid}/docs/{id}` (ver `src/lib/model.js` y `src/store/store.js`):
+  - `schools`: lista de colegios (nombre y versión Reducida/Completa).
+  - `<colegio>.meta`: grupos, horario, eventos, días no lectivos, cambios puntuales y ajustes del colegio.
+  - `<colegio>.g_<grupo>`: alumnos, criterios, actividades (tareas, exámenes y notas) y entregas.
+  - `<colegio>.a_<grupo>`: asistencia y anotaciones.
+  - Los datos anteriores a los colegios se pasan solos a un colegio «Mi colegio» (versión Completa).
 - **Sin conexión:** Firestore guarda una caché en el dispositivo y envía los cambios al volver la red. Además hay una copia local para arrancar al instante.
 - **Migraciones:** `SCHEMA` y `migrate()` en `src/lib/model.js` convierten datos antiguos al formato actual, al abrir la app y al importar una copia. Si cambias la forma de los datos, sube `SCHEMA` y añade el paso correspondiente.
 - **Deshacer:** todo cambio pasa por `change()` en `src/store/store.js`, que devuelve la función que lo deshace. Los borrados muestran un aviso con el botón «Deshacer».
@@ -100,7 +115,7 @@ src/
   store/        store.js (datos, sincronización con Firestore, deshacer) y actions.js
   components/   ui (ventanas, avisos, piezas), ClassCard, common
   modals/       ventanas de grupos, alumnos, criterios, actividades, eventos, horario, días no lectivos, Excel
-  views/        Hoy, Grupos (cuaderno, criterios, alumnos), Asistencia, Entregas, Calendario, Horario, Ajustes, Login
+  views/        Acceso (entrada y colegios), Hoy, Grupos, Notas, Asistencia, Horario, Planificador, Ajustes
   App.jsx       acceso, navegación y estructura
 public/         manifest, service worker e iconos
 ```
