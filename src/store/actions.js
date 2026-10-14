@@ -116,7 +116,7 @@ export const moveClass = (cls, to) => change(d => {
   if (cls.added) { Object.assign(m.overrides.find(o => o.id === cls.overrideId), to); return }
   const cancelId = uid()
   m.overrides.push({ id: cancelId, kind: 'cancel', sessId: cls.sessId, date: cls.date, reason: to.reason || '' })
-  m.overrides.push({ id: uid(), kind: 'add', groupId: cls.groupId, room: cls.room, ...to, fromId: cancelId })
+  m.overrides.push({ id: uid(), kind: 'add', type: cls.type || 'clase', note: cls.note || '', groupId: cls.groupId, room: cls.room, ...to, fromId: cancelId })
 })
 /** Quita una clase añadida. Si venía de mover una fija, la fija vuelve a su día. */
 export const removeAdded = cls => change(d => {
@@ -132,3 +132,22 @@ export function ensureSince() {
   if (!m.settings.since) change(d => { d.meta.settings.since = todayISO() })
 }
 export const wipeAll = () => replaceAll({ meta: defaultMeta() })
+
+/* ---------- ficha diaria del planificador (documento «diary» del colegio) ----------
+   diary[fecha] = { plan: [{ id, text, done }], todo: [{ id, text, done }], ev: { <clave>: true } }
+   plan = Planificado/Realizado · todo = mis pendientes · ev = eventos del día marcados como hechos */
+const dayOf = (D, date) => D[date] || (D[date] = { plan: [], todo: [], ev: {} })
+const tidy = (D, date) => { const x = D[date]; if (x && !x.plan.length && !x.todo.length && !Object.keys(x.ev).length) delete D[date] }
+export const diaryAdd = (date, list, text) => change(d => { dayOf(d.doc('diary'), date)[list].push({ id: uid(), text, done: false }) })
+export const diaryToggle = (date, list, id) => change(d => { const D = d.doc('diary'), it = dayOf(D, date)[list].find(x => x.id === id); if (it) it.done = !it.done })
+export const diaryDel = (date, list, id) => change(d => { const D = d.doc('diary'), day = dayOf(D, date); day[list] = day[list].filter(x => x.id !== id); tidy(D, date) })
+export const diaryEv = (date, key) => change(d => { const D = d.doc('diary'), day = dayOf(D, date); if (day.ev[key]) delete day.ev[key]; else day.ev[key] = true; tidy(D, date) })
+/** Pasa lo planificado y no realizado (y los pendientes sin hacer) al día siguiente indicado. */
+export const diaryCarry = (date, to) => change(d => {
+  const D = d.doc('diary'), day = dayOf(D, date), next = dayOf(D, to)
+  for (const list of ['plan', 'todo']) {
+    next[list].push(...day[list].filter(x => !x.done).map(x => ({ ...x, id: uid() })))
+    day[list] = day[list].filter(x => x.done)
+  }
+  tidy(D, date); tidy(D, to)
+})

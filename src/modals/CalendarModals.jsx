@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useAppState } from '../store/store'
 import * as act from '../store/actions'
 import { Modal, Field, useModal, useToast } from '../components/ui.jsx'
-import { EV_TYPES, BLOCK_TYPES } from '../lib/model'
+import { EV_TYPES, BLOCK_TYPES, SESSION_TYPES, sessType } from '../lib/model'
 import { metaOf, groupOf, groupDoc, trimOf } from '../lib/grades'
-import { classesOn, actKind } from '../lib/schedule'
+import { classesOn, actKind, sessLabel } from '../lib/schedule'
 import { PlanModal } from './ActModal.jsx'
 import { todayISO, DIAS, addDays, diffDays, fmtShort, fmtLong } from '../lib/dates'
 import { exportExcel } from '../lib/excel'
@@ -62,28 +62,39 @@ export function EventModal({ id, date }) {
 }
 
 /* ---------- sesiones del horario semanal ---------- */
-export function SessModal({ id, day }) {
+export function SessModal({ id, day, start, end }) {
   const st = useAppState(), toast = useToast(), { close } = useModal()
   const meta = metaOf(st.docs)
-  if (!meta.groups.length) return <Modal title="Nueva sesión"><p style={{ margin: 0 }}>Crea primero un grupo.</p></Modal>
-  const s = id ? meta.schedule.find(x => x.id === id) : { day: day || 1, start: '08:30', end: '09:25', groupId: meta.groups[0].id, room: '' }
+  const s = id ? meta.schedule.find(x => x.id === id) : { day: day || 1, start: start || '08:30', end: end || '09:25', type: meta.groups.length ? 'clase' : 'guardia', groupId: meta.groups[0] ? meta.groups[0].id : '', room: '', note: '' }
+  const [type, setType] = useState(s ? sessType(s) : 'clase')
   if (!s) return null
   const del = () => { const undo = act.deleteSess(id); close(); toast('Sesión eliminada del horario', undo) }
+  const withGroup = type === 'clase' || type === 'tutoria'
   return (
     <Modal title={id ? 'Editar sesión' : 'Nueva sesión'} left={id ? <button type="button" className="btn danger" onClick={del}>Eliminar</button> : null}
       onSubmit={fd => {
         if (fd.get('end') <= fd.get('start')) { toast('La hora de fin debe ser posterior al inicio'); return false }
-        act.saveSess(id, { day: Number(fd.get('day')), start: fd.get('start'), end: fd.get('end'), groupId: fd.get('groupId'), room: fd.get('room').trim() })
+        const groupId = withGroup ? fd.get('groupId') || '' : ''
+        if (type === 'clase' && !groupId) { toast('Una clase necesita un grupo. Créalo antes en la pestaña Grupos.'); return false }
+        act.saveSess(id, { type, day: Number(fd.get('day')), start: fd.get('start'), end: fd.get('end'), groupId, room: fd.get('room').trim(), note: type === 'clase' ? '' : (fd.get('note') || '').trim() })
       }}>
+      <div className="fld"><span className="lb">Tipo de sesión</span>
+        <div className="chips" role="radiogroup" aria-label="Tipo de sesión">{Object.entries(SESSION_TYPES).map(([k, t]) => (
+          <button type="button" key={k} role="radio" aria-checked={type === k} aria-pressed={type === k} className="chip" onClick={() => setType(k)}>
+            <span className="gdot" style={{ '--c': t.color || 'var(--accent)' }} />{t.label}
+          </button>
+        ))}</div>
+      </div>
       <div className="frow">
         <Field label="Día" id="f_sday"><select id="f_sday" name="day" defaultValue={s.day}>{[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{DIAS[d]}</option>)}</select></Field>
-        <Field label="Grupo" id="f_sgroup"><GroupSelect meta={meta} name="groupId" value={s.groupId} id="f_sgroup" /></Field>
+        {withGroup ? <Field label={type === 'clase' ? 'Grupo' : 'Grupo (opcional)'} id="f_sgroup"><GroupSelect meta={meta} name="groupId" value={s.groupId} none={type !== 'clase'} id="f_sgroup" /></Field> : null}
       </div>
       <div className="frow">
         <Field label="Inicio" id="f_sstart"><input type="time" id="f_sstart" name="start" required defaultValue={s.start} /></Field>
         <Field label="Fin" id="f_send"><input type="time" id="f_send" name="end" required defaultValue={s.end} /></Field>
-        <Field label="Aula" id="f_sroom"><input id="f_sroom" name="room" defaultValue={s.room} placeholder="Taller 1" /></Field>
+        {type !== 'libre' ? <Field label="Aula o lugar" id="f_sroom"><input id="f_sroom" name="room" defaultValue={s.room} placeholder={type === 'guardia' ? 'Sala de profesores' : 'Taller 1'} /></Field> : <input type="hidden" name="room" value="" />}
       </div>
+      {type !== 'clase' ? <Field label="Detalle (opcional)" id="f_snote"><input id="f_snote" name="note" defaultValue={s.note || ''} placeholder={{ guardia: 'Guardia de recreo, pasillo 1.ª planta…', tutoria: 'Atención a familias, tutoría con alumnos…', reunion: 'Departamento, CCP, equipo docente…', libre: 'Hora de preparación' }[type]} /></Field> : null}
     </Modal>
   )
 }
@@ -101,7 +112,7 @@ export function BlockModal({ id, date }) {
   const classes = [], acts = []
   for (let i = 0; i < days; i++) {
     const d = addDays(range.start, i)
-    classesOn(meta, d).filter(c => !c.cancelled).forEach(c => classes.push(c))
+    classesOn(meta, d).filter(c => !c.cancelled && c.type !== 'libre').forEach(c => classes.push(c))
   }
   for (const g of meta.groups) for (const a of groupDoc(st.docs, g.id).activities) {
     if (a.date && a.date >= range.start && a.date <= range.end && actKind(a) !== 'grade') acts.push({ a, g })
@@ -125,7 +136,7 @@ export function BlockModal({ id, date }) {
       </div>
       {classes.length || acts.length ? (
         <div className="affected" role="status">
-          {classes.length ? <div><b>{classes.length}</b> clase{classes.length === 1 ? '' : 's'} del horario no se darán{days === 1 ? ': ' + classes.map(c => (groupOf(st.docs, c.groupId) || {}).name + ' ' + c.start).join(', ') : ''}.</div> : null}
+          {classes.length ? <div><b>{classes.length}</b> sesi{classes.length === 1 ? 'ón' : 'ones'} del horario no se darán{days === 1 ? ': ' + classes.map(c => sessLabel(meta, c) + ' ' + c.start).join(', ') : ''}.</div> : null}
           {acts.map(({ a, g }) => <div key={a.id}>⚠ {actKind(a) === 'exam' ? 'Examen' : 'Entrega'} «{a.name}» de {g.name} el {fmtShort(a.date)}: quizá quieras cambiar la fecha.</div>)}
         </div>
       ) : null}

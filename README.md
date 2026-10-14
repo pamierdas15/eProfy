@@ -1,8 +1,8 @@
-# eProfy (React + Vite) · versión Prueba 05
+# eProfy (React + Vite) · versión Prueba 07
 
 Cuaderno del profesor para el instituto. Cada usuario tiene sus **colegios**, y cada colegio usa una de dos versiones:
 
-- **Reducida:** Hoy, Grupos, Horario y Planificador (calendario mensual + planificador de tareas).
+- **Reducida:** Hoy, Grupos, Horario (horario semanal + configurador, con clases, guardias, tutorías, reuniones y horas libres) y Planificador (bloques Eventos y Tareas, cada uno con su calendario mensual).
 - **Completa:** lo mismo más Notas (cuaderno por criterios LOMLOE) y Asistencia.
 
 Ajustes se abre con la rueda dentada de arriba. Incluye días no lectivos, cambios puntuales de clase, exportación a Excel y copias de seguridad. Es una PWA instalable que se adapta al móvil y al PC y sincroniza los datos con Firebase.
@@ -97,6 +97,7 @@ eProfy indica en **Ajustes → Cuenta y sincronización** qué falta. La app sie
   - `<colegio>.meta`: grupos, horario, eventos, días no lectivos, cambios puntuales y ajustes del colegio.
   - `<colegio>.g_<grupo>`: alumnos, criterios, actividades (tareas, exámenes y notas) y entregas.
   - `<colegio>.a_<grupo>`: asistencia y anotaciones.
+  - `<colegio>.diary`: ficha de cada día del Planificador (Planificado, Realizado y pendientes).
   - Los datos anteriores a los colegios se pasan solos a un colegio «Mi colegio» (versión Completa).
 - **Sin conexión:** Firestore guarda una caché en el dispositivo y envía los cambios al volver la red. Además hay una copia local para arrancar al instante.
 - **Migraciones:** `SCHEMA` y `migrate()` en `src/lib/model.js` convierten datos antiguos al formato actual, al abrir la app y al importar una copia. Si cambias la forma de los datos, sube `SCHEMA` y añade el paso correspondiente.

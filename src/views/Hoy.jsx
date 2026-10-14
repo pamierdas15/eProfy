@@ -69,7 +69,7 @@ export default function Hoy({ params }) {
       </div>
       <div className="week">
         {[0, 1, 2, 3, 4, 5, 6].map(i => {
-          const day = addDays(mon, i), blk = blockedOn(meta, day), n = blk ? 0 : classesOn(meta, day).filter(c => !c.cancelled).length
+          const day = addDays(mon, i), blk = blockedOn(meta, day), n = blk ? 0 : classesOn(meta, day).filter(c => !c.cancelled && c.type !== 'libre').length
           return (
             <button key={day} aria-pressed={day === sel} className={day === t ? 'today' : ''} onClick={() => setSel(day)} aria-label={DIAS[weekday(day)] + ' ' + parseISO(day).getDate() + (blk ? ', no lectivo' : n ? ', ' + n + ' clases' : '')}>
               <span>{DIAS_CORTOS[i + 1]}</span><b>{parseISO(day).getDate()}</b>

@@ -13,7 +13,7 @@ export default function Asistencia({ params }) {
   const st = useAppState(), { open } = useModal(), toast = useToast()
   const meta = metaOf(st.docs)
   const [date, setDate] = useState(params.date || todayISO())
-  const firstToday = () => { const c = classesOn(meta, date).find(x => !x.cancelled); return c ? c.groupId : (meta.groups[0] && meta.groups[0].id) }
+  const firstToday = () => { const c = classesOn(meta, date).find(x => !x.cancelled && x.groupId); return c ? c.groupId : (meta.groups[0] && meta.groups[0].id) }
   const [gid, setGid] = useState(params.gid || firstToday)
   const [force, setForce] = useState(false)
 
@@ -30,7 +30,7 @@ export default function Asistencia({ params }) {
   const sum = { P: 0, F: 0, R: 0, J: 0 }; sts.forEach(s => { if (day[s.id]) sum[day[s.id]]++ })
   const blk = blockedOn(meta, date)
   const hasClass = classesOn(meta, date).some(c => c.groupId === g.id && !c.cancelled)
-  const todays = blk ? [] : classesOn(meta, date).filter(c => !c.cancelled)
+  const todays = blk ? [] : classesOn(meta, date).filter(c => !c.cancelled && c.type === 'clase' && c.groupId)
 
   return (
     <>

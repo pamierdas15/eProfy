@@ -4,7 +4,7 @@ import * as act from '../store/actions'
 import { useNav } from '../nav'
 import { useModal, useToast } from './ui.jsx'
 import { ClassModal } from '../modals/CalendarModals.jsx'
-import { cvar, isFull } from '../lib/model'
+import { cvar, isFull, SESSION_TYPES } from '../lib/model'
 import { groupOf, attDoc } from '../lib/grades'
 import { fmtShort, todayISO, nowHM } from '../lib/dates'
 
@@ -21,18 +21,20 @@ export function ClassCard({ cls }) {
   }, [menu])
 
   const g = groupOf(st.docs, cls.groupId)
-  if (!g) return null
-  const day = attDoc(st.docs, g.id).att[cls.date]
+  const isClass = cls.type === 'clase'
+  if (isClass && !g) return null
+  const T = SESSION_TYPES[cls.type] || SESSION_TYPES.clase
+  const day = g ? attDoc(st.docs, g.id).att[cls.date] : null
   const done = day && Object.keys(day).length
   const isNow = cls.date === todayISO() && !cls.cancelled && nowHM() >= cls.start && nowHM() < cls.end
   const run = (msg, fn) => { setMenu(false); toast(msg, fn()) }
 
   return (
-    <div className={'class-card' + (isNow ? ' now' : '') + (cls.cancelled ? ' cancelled' : '')} style={{ '--c': cvar(g.color) }}>
+    <div className={'class-card' + (isNow ? ' now' : '') + (cls.cancelled ? ' cancelled' : '') + (isClass ? '' : ' other')} style={{ '--c': isClass ? cvar(g.color) : T.color }}>
       <div className="when"><b>{cls.start}</b>{cls.end}</div>
       <div style={{ minWidth: 0 }}>
-        <div className="ct">{g.name}</div>
-        <div className="muted" style={{ fontSize: '.85rem' }}>{g.subject || ''}{cls.room ? ' · ' + cls.room : ''}</div>
+        <div className="ct">{isClass ? g.name : T.label + (g ? ' · ' + g.name : '')}</div>
+        <div className="muted" style={{ fontSize: '.85rem' }}>{isClass ? g.subject || '' : cls.note || ''}{cls.room ? ((isClass ? g.subject : cls.note) ? ' · ' : '') + cls.room : ''}</div>
         <div className="badge-row">
           {isNow ? <span className="tag ok">Ahora</span> : null}
           {cls.cancelled ? <span className="tag warn">{cls.movedTo ? 'Movida al ' + fmtShort(cls.movedTo) : 'Cancelada'}</span> : null}
@@ -47,7 +49,7 @@ export function ClassCard({ cls }) {
           <button className="btn sm" onClick={() => toast('Clase restaurada', act.restoreClass(cls))}>Restaurar clase</button>
         ) : (
           <>
-            {isFull(st.school) ? <>
+            {!isClass ? null : isFull(st.school) ? <>
               <button className={'btn sm ' + (done ? '' : 'primary')} onClick={() => go('lista', { gid: g.id, date: cls.date })}>Pasar lista</button>
               <button className="btn sm" onClick={() => go('notas', { gid: g.id })}>Notas</button>
             </> : <button className="btn sm" onClick={() => go('grupos', { gid: g.id })}>Ver grupo</button>}

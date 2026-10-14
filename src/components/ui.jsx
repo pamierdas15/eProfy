@@ -147,3 +147,21 @@ function IosInstallModal() {
     </Modal>
   )
 }
+
+/* ---------- bloque plegable (comprimido por defecto) ---------- */
+/** `sub` se ve siempre (resumen); `actions` y el contenido solo cuando está desplegado. */
+export function Hero({ title, sub, actions, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className={'hero-sec fold' + (open ? ' open' : '')}>
+      <div className="hero-h">
+        <button type="button" className="hero-toggle" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+          <span className="chev" aria-hidden="true">›</span>
+          <span className="hero-tt"><h2>{title}</h2>{sub ? <span className="hero-sub">{sub}</span> : null}</span>
+        </button>
+        {open && actions ? <div className="row hero-actions">{actions}</div> : null}
+      </div>
+      {open ? <div className="hero-body">{children}</div> : null}
+    </section>
+  )
+}

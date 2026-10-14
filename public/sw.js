@@ -1,7 +1,7 @@
 // eProfy · service worker: permite abrir la app sin conexión.
 // Los datos los sincroniza Firestore por su cuenta; aquí solo se guarda la app en sí.
 // Cambia VERSION al publicar cambios importantes para limpiar las copias antiguas.
-const VERSION = 'eprofy-prueba-05';
+const VERSION = 'eprofy-prueba-07';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {

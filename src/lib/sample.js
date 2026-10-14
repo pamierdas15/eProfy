@@ -46,6 +46,10 @@ export function loadSample() {
       [['Informe propiedades de materiales', 'Tarea', -18, ['2.1'], true], ['Examen mecanismos', 'Examen', -6, ['3.1'], false], ['Arduino: sensor de temperatura', 'Práctica', 4, ['4.1'], true]], 9)
     const sch = [[1, '08:30', '09:25', g1, 'Taller 1'], [1, '11:45', '12:40', g2, 'Aula 2.3'], [2, '09:25', '10:20', g1, 'Taller 1'], [3, '10:20', '11:15', g2, 'Lab. informática'], [4, '08:30', '09:25', g1, 'Aula 1.4'], [4, '12:40', '13:35', g2, 'Taller 1'], [5, '10:20', '11:15', g2, 'Aula 2.3']]
     sch.forEach(([day, start, end, groupId, room]) => M.schedule.push({ id: uid(), day, start, end, groupId, room }))
+    M.schedule.push({ id: uid(), type: 'guardia', day: 2, start: '11:45', end: '12:40', groupId: '', room: 'Sala de profesores', note: 'Guardia de aula' })
+    M.schedule.push({ id: uid(), type: 'tutoria', day: 3, start: '12:40', end: '13:35', groupId: g1, room: 'Aula 1.4', note: 'Atención a familias' })
+    M.schedule.push({ id: uid(), type: 'reunion', day: 4, start: '09:25', end: '10:20', groupId: '', room: 'Departamento', note: 'Reunión de departamento' })
+    M.schedule.push({ id: uid(), type: 'libre', day: 5, start: '08:30', end: '09:25', groupId: '', room: '', note: '' })
     M.events.push({ id: uid(), title: 'Sesión de evaluación 1.ª', date: addDays(t, 12), time: '16:00', type: 'Evaluación', groupId: '', notes: '' })
     M.events.push({ id: uid(), title: 'Visita al FabLab', date: addDays(t, 5), time: '09:00', type: 'Excursión', groupId: g2, notes: 'Autorizaciones firmadas antes del viernes.' })
     M.events.push({ id: uid(), title: 'Reunión de departamento', date: addDays(t, 1), time: '14:30', type: 'Reunión', groupId: '', notes: '' })

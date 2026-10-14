@@ -11,7 +11,7 @@
 
 export const SCHEMA = 2
 /** Versión visible de la app (se muestra en Ajustes). */
-export const APP_VERSION = 'Prueba 05'
+export const APP_VERSION = 'Prueba 07'
 
 export const defaultTrims = () => [
   { start: '2026-09-08', end: '2026-12-22' },
@@ -97,6 +97,15 @@ export const FORMATS = {
 }
 export const formatOf = school => FORMATS[(school && school.format) || 'completa'] || FORMATS.completa
 export const isFull = school => !school || school.format !== 'reducida'
+/** Tipos de sesión del horario semanal. Solo «Clase» va siempre ligada a un grupo. */
+export const SESSION_TYPES = {
+  clase: { label: 'Clase', color: null },
+  guardia: { label: 'Guardia', color: 'var(--suf)' },
+  tutoria: { label: 'Tutoría', color: 'var(--sob)' },
+  reunion: { label: 'Reunión', color: 'var(--g4)' },
+  libre: { label: 'Libre', color: 'var(--ink-3)' }
+}
+export const sessType = s => SESSION_TYPES[(s && s.type) || 'clase'] ? (s.type || 'clase') : 'clase'
 export const ATT = { P: 'Presente', F: 'Falta', R: 'Retraso', J: 'Justificada' }
 export const DLV = { '': 'Pendiente', E: 'Entregado', T: 'Fuera de plazo', N: 'No entregado' }
 export const BLOCK_TYPES = {
